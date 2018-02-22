@@ -23,8 +23,8 @@ fn main() {
             .expect("failed to read file");
         s
     };
-    let (id, version) = infer_id_and_version(&content);
-    insert_spec_file(&conn, &opt.document_type, &version, &id, &content);
+    let version = infer_version(&content);
+    insert_spec_file(&conn, &opt.document_type, version, &content);
 }
 
 #[derive(StructOpt, Debug)]
@@ -40,39 +40,72 @@ struct Opt {
     document_type: String,
 }
 
-fn infer_id_and_version(content: &str) -> (String, String) {
+struct Version {
+    major: i32,
+    minor: i32,
+    patch: i32,
+}
+
+fn infer_version(content: &str) -> Version {
     use sxd_document::parser;
     use sxd_xpath::evaluate_xpath;
 
     let package = parser::parse(&content).expect("failed to parse XML");
     let document = package.as_document();
 
-    let id = evaluate_xpath(&document, "/descritor-escrituracao/@versao")
-        .expect("XPath evaluation failed");
-    let version =
-        evaluate_xpath(&document, "/descritor-escrituracao/@id").expect("XPath evaluation failed");
+    let major_and_minor = evaluate_xpath(&document, "/descritor-escrituracao/@versao")
+        .expect("XPath evaluation failed")
+        .string();
+    let patch = evaluate_xpath(&document, "/descritor-escrituracao/@id")
+        .expect("XPath evaluation failed")
+        .string()
+        .parse::<i32>()
+        .expect("couldn't parse patch number");
+    let (major, minor) = {
+        let n = 4;
+        if major_and_minor.len() < n {
+            panic!("version string is too short: {:?}", major_and_minor)
+        }
+        let mut chars = major_and_minor.chars().collect::<Vec<char>>();
+        let new_len = chars.len() - n;
+        let tail = chars.drain(new_len..).collect::<Vec<char>>();
 
-    (id.string(), version.string())
+        let major = chars
+            .into_iter()
+            .collect::<String>()
+            .parse::<i32>()
+            .expect("parse error");
+        let minor = tail.into_iter()
+            .collect::<String>()
+            .parse::<i32>()
+            .expect("parse error");
+        (major, minor)
+    };
+    Version {
+        major,
+        minor,
+        patch,
+    }
 }
 
 fn insert_spec_file(
     conn: &PgConnection,
     document_type: &str,
-    version: &str,
-    version_id: &str,
+    version: Version,
     specification: &str,
 ) {
     use diesel::sql_query;
-    use diesel::sql_types::Text;
+    use diesel::sql_types::{Int4, Text};
     use diesel::result::Error;
     use diesel::result::DatabaseErrorKind;
 
     let q = sql_query(
-        "INSERT INTO specification.sped (document_type, version, version_id, specification) \
-         VALUES ($1, $2, $3, $4::xml);",
+        "INSERT INTO specification.sped (document_type, major, minor, patch, specification) \
+         VALUES ($1, $2, $3, $4, $5::xml);",
     ).bind::<Text, _>(document_type)
-        .bind::<Text, _>(version)
-        .bind::<Text, _>(version_id)
+        .bind::<Int4, _>(version.major)
+        .bind::<Int4, _>(version.minor)
+        .bind::<Int4, _>(version.patch)
         .bind::<Text, _>(specification);
 
     match q.execute(conn) {
