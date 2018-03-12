@@ -53,16 +53,17 @@ fn infer_version(content: &str) -> Version {
     let package = parser::parse(&content).expect("failed to parse XML");
     let document = package.as_document();
 
-    let major_and_minor = evaluate_xpath(&document, "/descritor-escrituracao/@versao")
-        .expect("XPath evaluation failed")
-        .string();
-    let patch = evaluate_xpath(&document, "/descritor-escrituracao/@id")
+    let patch = evaluate_xpath(&document, "/descritor-escrituracao/@versao")
         .expect("XPath evaluation failed")
         .string()
         .parse::<i32>()
         .expect("couldn't parse patch number");
+
+    let major_and_minor = evaluate_xpath(&document, "/descritor-escrituracao/@id")
+        .expect("XPath evaluation failed")
+        .string();
     let (major, minor) = {
-        let n = 4;
+        let n = 3;
         if major_and_minor.len() < n {
             panic!("version string is too short: {:?}", major_and_minor)
         }
@@ -79,6 +80,7 @@ fn infer_version(content: &str) -> Version {
             .collect::<String>()
             .parse::<i32>()
             .expect("parse error");
+
         (major, minor)
     };
     Version {
