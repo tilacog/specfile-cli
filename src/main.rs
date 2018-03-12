@@ -8,6 +8,7 @@ use diesel::prelude::*;
 use structopt::StructOpt;
 
 mod sped;
+mod xsd;
 
 fn main() {
     let opt = Opt::from_args();
@@ -17,7 +18,7 @@ fn main() {
         FileType::Sped {
             ref specification_file,
         } => sped::run(specification_file, &conn, &opt.document_type),
-        FileType::Xsd { .. } => unimplemented!(),
+        FileType::Xsd { ref package_url } => xsd::run(package_url, &conn, &opt.document_type),
     }
 }
 
