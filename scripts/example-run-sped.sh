@@ -15,6 +15,9 @@ do
     FILES=$(find "${TARGET_DIRECTORY}" -type f -iname "${DT_NAME}*")
     for FILE in $FILES
     do
-	./target/release/specfile-cli "${FILE}" --database-url "${DATABASE_URI}" --document-type "${DT_NAME}" || true
+	./target/release/specfile-cli \
+	    --database-url "${DATABASE_URI}" \
+	    --document-type "${DT_NAME}" \
+	    sped --specification-file "${FILE}"|| true
     done
 done
